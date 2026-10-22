@@ -88,3 +88,4 @@ alias k='kubectl'
 alias j='just'
 alias d='docker'
 alias dc='docker compose'
+alias gpu-chrome="google-chrome --ignore-gpu-blocklist --enable-gpu-rasterization --use-angle=gles --disable-features=UseChromeOSDirectVideoDecoder,Vulkan &"
