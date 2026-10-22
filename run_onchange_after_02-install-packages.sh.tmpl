@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# packages.yaml hash: {{ include ".chezmoidata/packages.yaml" | sha256sum }}
+
+mkdir -p "$HOME/.local/bin"
+export PATH="$HOME/.local/bin:$PATH"
+
+{{ if eq .chezmoi.osRelease.id "ubuntu" -}}
+echo "==> Installing system packages via APT..."
+sudo apt update
+sudo apt install -y {{ .packages.ubuntu.apt | join " " }}
+
+# Alias Debian binary names to standard UNIX commands
+if command -v batcat &> /dev/null && [ ! -f "$HOME/.local/bin/bat" ]; then
+    ln -sf "$(which batcat)" "$HOME/.local/bin/bat"
+fi
+
+if command -v fdfind &> /dev/null && [ ! -f "$HOME/.local/bin/fd" ]; then
+    ln -sf "$(which fdfind)" "$HOME/.local/bin/fd"
+fi
+
+# Configure Docker daemon & permissions
+sudo systemctl enable --now docker
+if ! groups "$USER" | grep -q '\bdocker\b'; then
+    sudo usermod -aG docker "$USER"
+fi
+
+# Set default login shell to Zsh
+if [ "$SHELL" != "$(which zsh)" ]; then
+    sudo chsh -s "$(which zsh)" "$USER"
+fi
+{{ end -}}
+
+# 1. Starship Prompt
+if ! command -v starship &> /dev/null; then
+    echo "==> Installing Starship..."
+    curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$HOME/.local/bin"
+fi
+
+# 2. just command runner
+if ! command -v just &> /dev/null; then
+    echo "==> Installing just..."
+    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
+fi
+
+# 3. uv Python manager
+if ! command -v uv &> /dev/null; then
+    echo "==> Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
+
+# 4. Global Python CLI tools
+{{ range .packages.ubuntu.uv_tools -}}
+"$HOME/.local/bin/uv" tool install {{ . }} --upgrade
+{{ end -}}
+
+# 5. fnm Node Manager
+if ! command -v fnm &> /dev/null; then
+    echo "==> Installing fnm..."
+    curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell --install-dir "$HOME/.local/bin"
+fi
+
+# 6. VS Code Extensions
+if command -v code &> /dev/null; then
+    echo "==> Syncing VS Code extensions..."
+    installed_exts=$(code --list-extensions)
+    {{ range .packages.ubuntu.vscode_extensions -}}
+    if ! echo "$installed_exts" | grep -qi "^{{ . }}$"; then
+        code --install-extension {{ . }} --force
+    fi
+    {{ end -}}
+fi

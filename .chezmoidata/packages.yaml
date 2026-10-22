@@ -1,0 +1,31 @@
+packages:
+  ubuntu:
+    apt:
+      - zsh
+      - git
+      - curl
+      - jq
+      - fzf
+      - ripgrep
+      - fd-find
+      - bat
+      - zoxide
+      - ca-certificates
+      - gnupg
+      - podman
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+      - code
+    uv_tools:
+      - ruff
+    vscode_extensions:
+      - charliermarsh.ruff
+      - ms-python.python
+      - Vue.volar
+      - bradlc.vscode-tailwindcss
+      - ms-azuretools.vscode-docker
+      - redhat.vscode-yaml
+      - tonsky.theme-alabaster

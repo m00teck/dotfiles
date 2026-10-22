@@ -1,0 +1,90 @@
+# 1. Environment & Path (Prioritize ~/.local/bin)
+typeset -U path fpath cdpath manpath
+path=(
+    "$HOME/.local/bin"
+    "$HOME/.local/share/fnm"
+    "/usr/local/bin"
+    "/usr/bin"
+    "/bin"
+    "/usr/sbin"
+    "/sbin"
+    $path
+)
+export PATH
+
+# 2. Fast Cached Completions
+autoload -Uz compinit
+ZCOMPDUMP="${ZDOTDIR:-$HOME}/.zcompdump"
+if [[ -n "$ZCOMPDUMP"(#qN.m+1) ]]; then
+    compinit
+else
+    compinit -C
+fi
+
+{
+    if [[ -s "$ZCOMPDUMP" && (! -s "${ZCOMPDUMP}.zwc" || "$ZCOMPDUMP" -nt "${ZCOMPDUMP}.zwc") ]]; then
+        zcompile "$ZCOMPDUMP"
+    fi
+} &!
+
+# 3. Zinit Plugin Manager (Async Turbo Loading)
+ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
+if [[ ! -d "$ZINIT_HOME" ]]; then
+    mkdir -p "$(dirname "$ZINIT_HOME")"
+    git clone --depth 1 https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
+fi
+source "${ZINIT_HOME}/zinit.zsh"
+
+zinit light Aloxaf/fzf-tab
+
+zinit wait"0" lucid light-mode for \
+    atinit"ZINIT[COMPINIT_OPTS]=-C; zicompinit; zicdreplay" \
+    atload"fast-theme -q XDG:clean" \
+        zdharma-continuum/fast-syntax-highlighting \
+    atload"!_zsh_autosuggest_start" \
+        zsh-users/zsh-autosuggestions
+
+ZSH_AUTOSUGGEST_USE_ASYNC=1
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#5c6370"
+
+# 4. FZF Theme & Bat / Eza Previews
+export FZF_DEFAULT_OPTS=" \
+  --color=bg+:#282c34,bg:#1e222a,spinner:#61afef,hl:#e06c75 \
+  --color=fg:#abb2bf,header:#e06c75,info:#d19a66,pointer:#61afef \
+  --color=marker:#98c379,fg+:#ffffff,prompt:#61afef,hl+:#e06c75 \
+  --height=40% --layout=reverse --border"
+
+zstyle ':fzf-tab:*' fzf-flags ${(s: :)$(echo $FZF_DEFAULT_OPTS)}
+zstyle ':fzf-tab:*' switch-group ',' '.'
+zstyle ':fzf-tab:complete:cd:*' fzf-preview 'eza -1 --color=always $realpath'
+zstyle ':fzf-tab:complete:systemctl-*:*' fzf-preview 'SYSTEMD_COLORS=1 systemctl status $word'
+
+zstyle ':fzf-tab:complete:(cat|nano|bat|less):*' fzf-preview \
+  'if [[ -f ${(Q)realpath} ]]; then
+     bat --color=always --style=numbers --line-range=:500 ${(Q)realpath}
+   elif [[ -d ${(Q)realpath} ]]; then
+     eza -1 --color=always ${(Q)realpath}
+   fi'
+zstyle ':fzf-tab:complete:(cat|nano|bat|less):*' fzf-flags --preview-window=right:60%:wrap
+
+# CLI binary bindings
+command -v fzf >/dev/null && source <(fzf --zsh)
+command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
+command -v fnm >/dev/null && eval "$(fnm env --use-on-cd --shell zsh)"
+command -v starship >/dev/null && eval "$(starship init zsh)"
+
+# 5. History & DevOps Aliases
+HISTFILE="${ZDOTDIR:-$HOME}/.zsh_history"
+HISTSIZE=50000
+SAVEHIST=50000
+setopt EXTENDED_HISTORY HIST_EXPIRE_DUPS_FIRST HIST_IGNORE_DUPS HIST_IGNORE_ALL_DUPS HIST_FIND_NO_DUPS HIST_IGNORE_SPACE HIST_SAVE_NO_DUPS SHARE_HISTORY
+
+alias ls='eza --icons=never --group-directories-first'
+alias ll='eza -la --icons=never --group-directories-first --git'
+alias cat='bat --style=plain --paging=never'
+alias k='kubectl'
+alias j='just'
+alias d='docker'
+alias dc='docker compose'

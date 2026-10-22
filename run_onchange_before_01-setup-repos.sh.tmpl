@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{ if eq .chezmoi.osRelease.id "ubuntu" -}}
+echo "==> Configuring external APT repositories..."
+
+sudo apt update
+sudo apt install -y ca-certificates curl gnupg
+
+# 1. Docker CE
+if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
+    sudo install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    sudo chmod a+r /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+        sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+fi
+
+# 2. VS Code (Clean up legacy/conflicting vendor files first)
+sudo rm -f /etc/apt/sources.list.d/microsoft-vscode.list /etc/apt/sources.list.d/vscode.sources
+
+if [ ! -f /etc/apt/keyrings/packages.microsoft.gpg ]; then
+    sudo install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/packages.microsoft.gpg > /dev/null
+    sudo chmod a+r /etc/apt/keyrings/packages.microsoft.gpg
+fi
+
+echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" | \
+    sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
+
+# 3. eza
+if [ ! -f /etc/apt/keyrings/gierens.gpg ]; then
+    sudo install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+    sudo chmod a+r /etc/apt/keyrings/gierens.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | \
+        sudo tee /etc/apt/sources.list.d/gierens.list > /dev/null
+fi
+
+sudo apt update
+{{ end -}}
